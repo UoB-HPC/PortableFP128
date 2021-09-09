@@ -1,4 +1,5 @@
-//===-- pfp128.h - Architecture and compiler neutral shims for 128b IEEE FP --------------*- C -*-===//
+//===-- pfp128.h - Architecture and compiler neutral shims for 128b IEEE FP
+//--------------*- C -*-===//
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -15,157 +16,214 @@
 #if (!defined(__PFP128_H_INCLUDED))
 #define __PFP128_H_INCLUDED 1
 
-#if (!(__x86_64__ || __aarch64__ || __riscv))
-#error Unknown target architecture.
+// Tell the system headers that we want all of the types, please.
+// (Not that it seems to do much good!)
+#define __STDC_WANT_IEC_60559_TYPES_EXT__ 1
+#include <math.h>
+#include <float.h>
+#include <complex.h>
+
+#if (!(__x86_64__ || __aarch64__ || __riscv || __arm__))
+# error Unknown target architecture.
 #endif
 
-// If the compiler has already set this, that's fine with us;
-// if not, set it for the cases we know about.
-#if (!defined(__LONG_DOUBLE_IEEE128__))
-// Add platforms for which the 128b IEEE float is long double here.
-// This seems to be the case for Aarch64 and RISC-V both 32b and 64b, but not
-// 32b Arm.
-if (__aarch64__ || __riscv)
-#define __LONG_DOUBLE_IEEE128__ 1
-#endif
-#endif
-
-#if (defined(__LONG_DOUBLE_IEEE128__))
-  // FP128 is long double which is  supported by the compiler.
-  // (Note than the C standard only requires that long double
-  // is at least as large as double, so it  may be accepted
-  // syntactically, but not get you any more precision.
-  // That is why we need to check architectures above...
-  typedef long double FP128; // Both LLVM and GCC support the long float
-  typedef _Complex long double COMPLEX_FP128;
-
-#define FP128_CONST(val) val##L // the L suffix on constants, and
-#define FP128_FMT_TAG "L"       // as a format suffix in printf,
-#define FP128_FUNCTION_TAG l    // and we want the functions from libm
-                                // tagged with l
-#else
+// Architecture neutral stuff, which we hope will catch what is going on!
+// The compiler supports the IEC 559 specification, however, that does
+// not actually require support for the 128b type.
+// So we check whether the property macros for FLT128 are present
+#if ((defined(__STDC_IEC_60559_TYPES__) ||      \
+      defined(__STDC_IEC_559__)) &&             \
+     defined(FLT128_MAX))
+typedef _Float128 FP128; 
+typedef _Complex _Float128 COMPLEX_FP128;
+// No format specifier is given in the standard...
+// We assume for now that we're dealing with a GNU implementation and that 'q'
+// will work.
+# define FP128_FMT_TAG "Q" // Format suffix in printf,
+# define FP128_CONST(val) val ## F128
+# define FP128Name(function) function ## f128
+#elif (defined(__LONG_DOUBLE_IEEE128__))
+# define USE_LONGDOUBLE_FP128 1
+// No standard conformant support has been promised by the implementation.
+// So we have to guess based on the target and compiler.
+// First check for the case we believe does not provide any support.
+#elif (__APPLE__ && __MACH__ && __aarch64__)
+# warning "No IEEE 128b float seems to be available on MacOS/AArch64..."
+# warning "FP128 will only be the same as double (i.e. 64b)."
+// Use long double, but it'll only be 64b
+# define USE_LONGDOUBLE_FP128 1
+#elif (__arm__)
+# warning "No IEEE 128b float seems to be available on 32b Arm..."
+# warning "FP128 will only be the same as double (i.e. 64b)."
+// Use long double, but it'll only be 64b
+#define USE_LONGDOUBLE_FP128 1
+#elif (__aarch64__)
+// We can use long double with both LLVM and GCC,
+// and, other than on MacOS, that gets us what we want.
+# define USE_LONGDOUBLE_FP128 1
+#elif (__x86_64__)
 // long double is not the IEEE 128b format.
-// We expect this to be x86_64, and haven't checked other places,
-// so for now error out if it's not,
-#if (!__x86_64__)
-#error On an architecture this code does not understand.
-#endif
 #include <quadmath.h>
 
 // Need to step very carefully around 80b floats!
 typedef __float128 FP128; // Both LLVM and GCC support the __float128 type,
 typedef __complex128 COMPLEX_FP128;
 
-#define FP128_CONST(val) val##Q // the Q suffix on constants, and
-#define FP128_FMT_TAG "Q"       // as a format suffix in printf,
-#define FP128_FUNCTION_TAG q    // and we want the functions tagged with q
-#endif                          // end of architecture spcific setup.
+# define FP128_FMT_TAG "Q" // as a format suffix in printf,
+# define FP128_CONST(val) val ## Q
+# define FP128Name(function) function ## q
+#else
+# error On an architecture this code does not understand.
+#endif
+
+#if (defined (__LONG_DOUBLE_IEEE128__) || USE_LONGDOUBLE_FP128)
+// The compiler supports IEEE 128b float as long double.
+// Or we are pretending that it does...
+// The C standard only requires that long double
+// is at least as large as double, so it  may be accepted
+// syntactically, but not get you any more precision.
+typedef long double FP128; // Both LLVM and GCC support the long float
+typedef _Complex long double COMPLEX_FP128;
+
+#define FP128_FMT_TAG "L" // Format suffix in printf,
+#define FP128_CONST(val) val ## L
+#define FP128Name(function) function ## l
+#endif
+
+#undef USE_LONGDOUBLE_FP128
 
 // From here on the code is common no matter what the underlying implementation.
-// Macro for adding the tag
-#define FP128MathFunction(base) base##FP128_FUNCTION_TAG
 
 // Maths functions
-// Macro on the simple name, rather than a function application in case
-// there's code like
-// FP128 (func)(FP128) = acosFP128;
-//
-#define acosFP128 FP128MathFunction(acos)
-#define acoshFP128 FP128MathFunction(acosh)
-#define asinFP128 FP128MathFunction(asin)
-#define asinhFP128 FP128MathFunction(asinh)
-#define atanFP128 FP128MathFunction(atan)
-#define atanhFP128 FP128MathFunction(atanh)
-#define atan2FP128 FP128MathFunction(atan2)
-#define cbrtFP128 FP128MathFunction(cbrt)
-#define ceilFP128 FP128MathFunction(ceil)
-#define copysignFP128 FP128MathFunction(copysign)
-#define coshFP128 FP128MathFunction(cosh)
-#define cosFP128 FP128MathFunction(cos)
-#define erfFP128 FP128MathFunction(erf)
-#define erfcFP128 FP128MathFunction(erfc)
-#define exp2FP128 FP128MathFunction(exp2)
-#define expFP128 FP128MathFunction(exp)
-#define expm1FP128 FP128MathFunction(expm1)
-#define fabsFP128 FP128MathFunction(fabs)
-#define fdimFP128 FP128MathFunction(fdim)
-#define finiteFP128 FP128MathFunction(finite)
-#define floorFP128 FP128MathFunction(floor)
-#define fmaFP128 FP128MathFunction(fma)
-#define fmaxFP128 FP128MathFunction(fmax)
-#define fminFP128 FP128MathFunction(fmin)
-#define fmodFP128 FP128MathFunction(fmod)
-#define frexpFP128 FP128MathFunction(frexp)
-#define hypotFP128 FP128MathFunction(hypot)
-#define isinfFP128 FP128MathFunction(isinf)
-#define ilogbFP128 FP128MathFunction(ilogb)
-#define isnanFP128 FP128MathFunction(isnan)
-#define issignalingFP128 FP128MathFunction(issignaling)
-#define j0FP128 FP128MathFunction(j0)
-#define j1FP128 FP128MathFunction(j1)
-#define jnFP128 FP128MathFunction(jn)
-#define ldexpFP128 FP128MathFunction(ldexp)
-#define lgammaFP128 FP128MathFunction(lgamma)
-#define llrintFP128 FP128MathFunction(llrint)
-#define llroundFP128 FP128MathFunction(llround)
-#define logbFP128 FP128MathFunction(logb)
-#define logFP128 FP128MathFunction(log)
-#define log10FP128 FP128MathFunction(log10)
-#define log2FP128 FP128MathFunction(log2)
-#define log1pFP128 FP128MathFunction(log1p)
-#define lrintFP128 FP128MathFunction(lrint)
-#define lroundFP128 FP128MathFunction(lround)
-#define modfFP128 FP128MathFunction(modf)
-#define nanFP128 FP128MathFunction(nan)
-#define nearbyintFP128 FP128MathFunction(nearbyint)
-#define nextafterFP128 FP128MathFunction(nextafter)
-#define powFP128 FP128MathFunction(pow)
-#define remainderFP128 FP128MathFunction(remainder)
-#define remquoFP128 FP128MathFunction(remquo)
-#define rintFP128 FP128MathFunction(rint)
-#define roundFP128 FP128MathFunction(round)
-#define scalblnFP128 FP128MathFunction(scalbln)
-#define scalbnFP128 FP128MathFunction(scalbn)
-#define signbitFP128 FP128MathFunction(signbit)
-#define sincosFP128 FP128MathFunction(sincos)
-#define sinhFP128 FP128MathFunction(sinh)
-#define sinFP128 FP128MathFunction(sin)
-#define sqrtFP128 FP128MathFunction(sqrt)
-#define tanFP128 FP128MathFunction(tan)
-#define tanhFP128 FP128MathFunction(tanh)
-#define tgammaFP128 FP128MathFunction(tgamma)
-#define truncFP128 FP128MathFunction(trunc)
-#define y0FP128 FP128MathFunction(y0)
-#define y1FP128 FP128MathFunction(y1)
-#define ynFP128 FP128MathFunction(yn)
+// Implememt inline static shims.
 
-// Complex function names
-#define cabsFP128 FP128MathFunction(cabs)
-#define cargFP128 FP128MathFunction(carg)
-#define cimagFP128 FP128MathFunction(cimag)
-#define crealFP128 FP128MathFunction(creal)
-#define cacosFP128 FP128MathFunction(cacos)
-#define cacoshFP128 FP128MathFunction(cacosh)
-#define casinFP128 FP128MathFunction(casin)
-#define casinhFP128 FP128MathFunction(casinh)
-#define catanFP128 FP128MathFunction(catan)
-#define catanhFP128 FP128MathFunction(catanh)
-#define ccosFP128 FP128MathFunction(ccos)
-#define ccoshFP128 FP128MathFunction(ccosh)
-#define cexpFP128 FP128MathFunction(cexp)
-#define cexpiFP128 FP128MathFunction(cexpi)
-#define clogFP128 FP128MathFunction(clog)
-#define clog10FP128 FP128MathFunction(clog10)
-#define conjFP128 FP128MathFunction(conj)
-#define cpowFP128 FP128MathFunction(cpow)
-#define cprojFP128 FP128MathFunction(cproj)
-#define csinFP128 FP128MathFunction(csin)
-#define csinhFP128 FP128MathFunction(csinh)
-#define csqrtFP128 FP128MathFunction(csqrt)
-#define ctanFP128 FP128MathFunction(ctan)
-#define ctanhFP128 FP128MathFunction(ctanh)
+// clang-format really messes up the multiple line macro definitions :-(
+// clang-format off
+#define CreateUnaryShim(basename, restype, argtype)             \
+  static inline restype basename ## FP128(argtype arg) {        \
+    return FP128Name(basename)(arg);                            \
+  }
+
+// Could do all of this with one macro if we passed in the argument
+// list rather than the argument types, but it's not much simpler.
+#define CreateBinaryShim(basename, restype, at1, at2)           \
+  static inline restype basename ## FP128(at1 arg1, at2 arg2) { \
+    return FP128Name(basename)(arg1, arg2);                     \
+  }
+
+#define CreateTernaryShim(basename, restype, at1, at2, at3)             \
+  static inline restype basename ## FP128(at1 arg1, at2 arg2, at3 arg3) { \
+    return FP128Name(basename)(arg1, arg2, arg3);                       \
+  }
+
+#define FOREACH_UNARY_FUNCTION(op)              \
+  op(acos, FP128, FP128)                        \
+  op(acosh, FP128, FP128)                       \
+  op(asin, FP128, FP128)                        \
+  op(asinh, FP128, FP128)                       \
+  op(atan, FP128, FP128)                        \
+  op(atanh, FP128, FP128)                       \
+  op(cbrt, FP128, FP128)                        \
+  op(ceil, FP128, FP128)                        \
+  op(cosh, FP128, FP128)                        \
+  op(cos, FP128, FP128)                         \
+  op(erf, FP128, FP128)                         \
+  op(erfc, FP128, FP128)                        \
+  op(exp2, FP128, FP128)                        \
+  op(exp, FP128, FP128)                         \
+  op(expm1, FP128, FP128)                       \
+  op(fabs, FP128, FP128)                        \
+  op(floor, FP128, FP128)                       \
+  op(ilogb, int, FP128)                         \
+  op(lgamma, FP128, FP128)                      \
+  op(llrint, long long int, FP128)              \
+  op(llround, long long int, FP128)             \
+  op(logb, FP128, FP128)                        \
+  op(log, FP128, FP128)                         \
+  op(log10, FP128, FP128)                       \
+  op(log2, FP128, FP128)                        \
+  op(log1p, FP128, FP128)                       \
+  op(lrint, long int, FP128)                    \
+  op(lround, long int, FP128)                   \
+  op(nan, FP128, const char *)                  \
+  op(nearbyint, FP128, FP128)                   \
+  op(rint, FP128, FP128)                        \
+  op(round, FP128, FP128)                       \
+  op(sinh, FP128, FP128)                        \
+  op(sin, FP128, FP128)                         \
+  op(sqrt, FP128, FP128)                        \
+  op(tan, FP128, FP128)                         \
+  op(tanh, FP128, FP128)                        \
+  op(tgamma, FP128, FP128)                      \
+  op(trunc, FP128, FP128)                       \
+  op(cabs, FP128, COMPLEX_FP128)                \
+  op(carg, FP128, COMPLEX_FP128)                \
+  op(cimag, FP128, COMPLEX_FP128)               \
+  op(creal, FP128, COMPLEX_FP128)               \
+  op(cacos, COMPLEX_FP128, COMPLEX_FP128)       \
+  op(cacosh, COMPLEX_FP128, COMPLEX_FP128)      \
+  op(casin, COMPLEX_FP128, COMPLEX_FP128)       \
+  op(casinh, COMPLEX_FP128, COMPLEX_FP128)      \
+  op(catan, COMPLEX_FP128, COMPLEX_FP128)       \
+  op(catanh, COMPLEX_FP128, COMPLEX_FP128)      \
+  op(ccos, COMPLEX_FP128, COMPLEX_FP128)        \
+  op(ccosh, COMPLEX_FP128, COMPLEX_FP128)       \
+  op(cexp, COMPLEX_FP128, COMPLEX_FP128)        \
+  op(clog, COMPLEX_FP128, COMPLEX_FP128)        \
+  op(conj, COMPLEX_FP128, COMPLEX_FP128)        \
+  op(cproj, COMPLEX_FP128, COMPLEX_FP128)       \
+  op(csin, COMPLEX_FP128, COMPLEX_FP128)        \
+  op(csinh, COMPLEX_FP128, COMPLEX_FP128)       \
+  op(csqrt, COMPLEX_FP128, COMPLEX_FP128)       \
+  op(ctan, COMPLEX_FP128, COMPLEX_FP128)        \
+  op(ctanh, COMPLEX_FP128, COMPLEX_FP128)
+
+FOREACH_UNARY_FUNCTION(CreateUnaryShim)
+
+// Functions with two arguments
+#define FOREACH_BINARY_FUNCTION(op)                     \
+  op(ldexp, FP128, FP128, int)                          \
+  op(modf, FP128, FP128, FP128 *)                       \
+  op(nextafter, FP128, FP128, FP128)                    \
+  op(pow, FP128, FP128, FP128)                          \
+  op(remainder, FP128, FP128, FP128)                    \
+  op(cpow, COMPLEX_FP128, COMPLEX_FP128, COMPLEX_FP128) \
+  op(atan2, FP128, FP128, FP128)                        \
+  op(copysign, FP128, FP128, FP128)                     \
+  op(fdim, FP128, FP128, FP128)                         \
+  op(fmax, FP128, FP128, FP128)                         \
+  op(fmin, FP128, FP128, FP128)                         \
+  op(fmod, FP128, FP128, FP128)                         \
+  op(frexp, FP128, FP128, int *)                        \
+  op(hypot, FP128, FP128, FP128)
+
+FOREACH_BINARY_FUNCTION(CreateBinaryShim)
+
+// Functions with three arguments
+#define FOREACH_TERNARY_FUNCTION(op)            \
+  op(remquo, FP128, FP128, FP128, int *)        \
+  op(fma, FP128, FP128, FP128, FP128)
+
+FOREACH_TERNARY_FUNCTION(CreateTernaryShim)
+
+// clang-format on
+
+// Cleanliness
+#undef FOREACH_UNARY_FUNCTION
+#undef FOREACH_BINARY_FUNCTION
+#undef FOREACH_TERNARY_FUNCTION
+#undef CreateUnaryShim
+#undef CreateBinaryShim
+#undef CreateTernaryShim
 
 // Constants
+// I have no idea why there is the inconsistency in naming between these
+// constants which have the type at the front, and the others which have the
+// type tag at the end but that's how the standard headers work, so we follow.
+
+// Properties of the type
+// Since the whole point is that this header is giving us IEEE 128b float we can
+// put the actual values in here and not bother to delegate.
 #define FP128_MAX FP128_CONST(1.18973149535723176508575932662800702e4932)
 #define FP128_MIN FP128_CONST(3.36210314311209350626267781732175260e-4932)
 #define FP128_EPSILON FP128_CONST(1.92592994438723585305597794258492732e-34)
@@ -177,34 +235,24 @@ typedef __complex128 COMPLEX_FP128;
 #define FP128_DIG 33
 #define FP128_MIN_10_EXP (-4931)
 #define FP128_MAX_10_EXP 4932
+#define HUGE_VALFP128 FP128Name(HUGE_VAL)
 
-// #define HUGE_VALFP128 __builtin_huge_valq()
-#define M_EFP128 FP128_CONST(2.718281828459045235360287471352662498) /* e */
-#define M_LOG2EFP128                                                           \
-  FP128_CONST(1.442695040888963407359924681001892137) /* log_2 e */
-#define M_LOG10EFP128                                                          \
-  FP128_CONST(0.434294481903251827651128918916605082) /* log_10 e */
-#define M_LN2FP128                                                             \
-  FP128_CONST(0.693147180559945309417232121458176568) /* log_e 2 */
-#define M_LN10FP128                                                            \
-  FP128_CONST(2.302585092994045684017991454684364208) /* log_e 10 */
-#define M_PIFP128 FP128_CONST(3.141592653589793238462643383279502884) /* pi */
-#define M_PI_2FP128                                                            \
-  FP128_CONST(1.570796326794896619231321691639751442) /* pi/2 */
-#define M_PI_4FP128                                                            \
-  FP128_CONST(0.785398163397448309615660845819875721) /* pi/4 */
-#define M_1_PIFP128                                                            \
-  FP128_CONST(0.318309886183790671537767526745028724) /* 1/pi */
-#define M_2_PIFP128                                                            \
-  FP128_CONST(0.636619772367581343075535053490057448) /* 2/pi */
-#define M_2_SRTPIFP128                                                         \
-  FP128_CONST(1.128379167095512573896158903121545172) /* 2/sqrt(pi) */
-#define M_SRT2FP128                                                            \
-  FP128_CONST(1.414213562373095048801688724209698079) /* sqrt(2) */
-#define M_SRT1_2FP128                                                          \
-  FP128_CONST(0.707106781186547524400844362104849039) /* 1/sqrt(2) */
+// Properties of mathematics; we delegate here just for simplicity.
+#define M_E_FP128	FP128_CONST(2.718281828459045235360287471352662498)  /* e */
+#define M_LOG2E_FP128	FP128_CONST(1.442695040888963407359924681001892137)  /* log_2 e */
+#define M_LOG10E_FP128	FP128_CONST(0.434294481903251827651128918916605082)  /* log_10 e */
+#define M_LN2_FP128	FP128_CONST(0.693147180559945309417232121458176568)  /* log_e 2 */
+#define M_LN10_FP128	FP128_CONST(2.302585092994045684017991454684364208)  /* log_e 10 */
+#define M_PI_FP128	FP128_CONST(3.141592653589793238462643383279502884)  /* pi */
+#define M_PI_2_FP128	FP128_CONST(1.570796326794896619231321691639751442)  /* pi/2 */
+#define M_PI_4_FP128	FP128_CONST(0.785398163397448309615660845819875721)  /* pi/4 */
+#define M_1_PI_FP128	FP128_CONST(0.318309886183790671537767526745028724)  /* 1/pi */
+#define M_2_PI_FP128	FP128_CONST(0.636619772367581343075535053490057448)  /* 2/pi */
+#define M_2_SQRTPI_FP128 FP128_CONST(1.128379167095512573896158903121545172)  /* 2/sqrt(pi) */
+#define M_SQRT2_FP128	FP128_CONST(1.414213562373095048801688724209698079)  /* sqrt(2) */
+#define M_SQRT1_2_FP128	FP128_CONST(0.707106781186547524400844362104849039)  /* 1/sqrt(2) */
 
 // Cleanliness
-#undef FP128MathFunction
+#undef FP128Name
 
 #endif // Header monotonicity

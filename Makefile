@@ -4,7 +4,7 @@ CCBASE = $(notdir $(CC))
 
 # Check for gcc and add libquadmath if we are using it.
 ifneq "$(findstring gcc, $(CCBASE))" ""
-LDFLAGS += -lquadmath
+# LDFLAGS += -lquadmath
 endif
 
 testPFP128_$(CCBASE): pfp128.h
@@ -13,7 +13,7 @@ testPFP128_$(CCBASE): pfp128.h
 	$(CC) -o $@ -c $(CFLAGS) $<
 
 %: %.o
-	$(CC) $(LDFLAGS) -o $@ $<
+	$(CC) -o $@ $< -lm  $(LDFLAGS) 
 
 clean:
 	rm testPFP128_* *.o

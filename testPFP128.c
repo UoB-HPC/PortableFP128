@@ -10,6 +10,7 @@
 #include <stdint.h>
 #include <math.h>
 #include <complex.h>
+#define PFP128_SHOW_CONFIG 1
 #include "pfp128.h"
 
 // Expand a macro and convert the result into a string
@@ -317,8 +318,7 @@ static int checkSize() {
 }
 
 int main (int argc, char ** argv) {
-
-  printf (COMPILER_NAME " targetting " TARGET_ARCH_NAME "\n");
+  printf (COMPILER_NAME " targeting " TARGET_ARCH_NAME "\n");
   if (!checkSize()) {
     printf ("checkSize failed\n");
     return 1;

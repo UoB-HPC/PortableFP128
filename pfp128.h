@@ -13,8 +13,8 @@
  *
  */
 // Header monotonicity.
-#if (!defined(__PFP128_H_INCLUDED))
-#define __PFP128_H_INCLUDED 1
+#if (!defined(_PFP128_H_INCLUDED_))
+#define _PFP128_H_INCLUDED_ 1
 
 // Tell the system headers that we want all of the types, please.
 // (Not that it seems to do much good!)
@@ -27,6 +27,7 @@
 # error Unknown target architecture.
 #endif
 
+#if (0)
 // Architecture neutral stuff, which we hope will catch what is going on!
 // The compiler supports the IEC 559 specification, however, that does
 // not actually require support for the 128b type.
@@ -34,6 +35,9 @@
 #if ((defined(__STDC_IEC_60559_TYPES__) ||      \
       defined(__STDC_IEC_559__)) &&             \
      defined(FLT128_MAX))
+# if (PFP128_SHOW_CONFIG)
+#  warning __STDC_IEC_60559_TYPES__ or __STDC_IEC_559__ defined with FLT128_MAX
+# endif
 typedef _Float128 FP128; 
 typedef _Complex _Float128 COMPLEX_FP128;
 // No format specifier is given in the standard...
@@ -42,7 +46,13 @@ typedef _Complex _Float128 COMPLEX_FP128;
 # define FP128_FMT_TAG "Q" // Format suffix in printf,
 # define FP128_CONST(val) val ## F128
 # define FP128Name(function) function ## f128
-#elif (defined(__LONG_DOUBLE_IEEE128__))
+#endif
+#endif // zero-ed out
+
+#if (defined(__LONG_DOUBLE_IEEE128__))
+# if (PFP128_SHOW_CONFIG)
+#  warning __LONG_DOUBLE_IEEE128__ defined
+# endif
 # define USE_LONGDOUBLE_FP128 1
 // No standard conformant support has been promised by the implementation.
 // So we have to guess based on the target and compiler.
@@ -60,8 +70,15 @@ typedef _Complex _Float128 COMPLEX_FP128;
 #elif (__aarch64__)
 // We can use long double with both LLVM and GCC,
 // and, other than on MacOS, that gets us what we want.
+# if (PFP128_SHOW_CONFIG)
+#  warning __aarch64__ and not on MacOS
+# endif
 # define USE_LONGDOUBLE_FP128 1
 #elif (__x86_64__)
+# if (PFP128_SHOW_CONFIG)
+#  warning __x86_64__ 
+# endif
+
 // long double is not the IEEE 128b format.
 #include <quadmath.h>
 

@@ -23,14 +23,17 @@
 #include <float.h>
 #include <complex.h>
 
-// #if (0)
+
 // Architecture neutral C standard stuff, which we hope will catch what is going on!
 // The compiler supports the IEC 559 specification, however, that does
 // not actually require support for the 128b type.
 // So we check whether the property macros for FLT128 are present
-#if ((defined(__STDC_IEC_60559_TYPES__) ||      \
-      defined(__STDC_IEC_559__)) &&             \
-     defined(FLT128_MAX))
+
+// Zeroed out for now, since although GCC sets this on x86_64, linux,
+// the foof128 function names are not present in libm :-(
+#if (0 && ((defined(__STDC_IEC_60559_TYPES__) ||	\
+	    defined(__STDC_IEC_559__)) &&		\
+	   defined(FLT128_MAX)))
 # if (PFP128_SHOW_CONFIG)
 #  warning __STDC_IEC_60559_TYPES__ or __STDC_IEC_559__ defined with FLT128_MAX
 # endif
@@ -42,10 +45,7 @@ typedef _Complex _Float128 COMPLEX_FP128;
 # define FP128_FMT_TAG "Q" // Format suffix in printf,
 # define FP128_CONST(val) val ## F128
 # define FP128Name(function) function ## f128
-#endif
-// #endif // zero-ed out
-
-#if (defined(__LONG_DOUBLE_IEEE128__))
+#elif (defined(__LONG_DOUBLE_IEEE128__))
 # if (PFP128_SHOW_CONFIG)
 #  warning __LONG_DOUBLE_IEEE128__ defined
 # endif
@@ -141,7 +141,6 @@ typedef _Complex long double COMPLEX_FP128;
   op(cos, FP128, FP128)                         \
   op(erf, FP128, FP128)                         \
   op(erfc, FP128, FP128)                        \
-  op(exp2, FP128, FP128)                        \
   op(exp, FP128, FP128)                         \
   op(expm1, FP128, FP128)                       \
   op(fabs, FP128, FP128)                        \
@@ -189,6 +188,10 @@ typedef _Complex long double COMPLEX_FP128;
   op(csqrt, COMPLEX_FP128, COMPLEX_FP128)       \
   op(ctan, COMPLEX_FP128, COMPLEX_FP128)        \
   op(ctanh, COMPLEX_FP128, COMPLEX_FP128)
+
+// exp2 doesn't seem to be available everywhere.
+// If you need it, and have it, then add it in the obvious way.
+// op(exp2, FP128, FP128)			
 
 FOREACH_UNARY_FUNCTION(CreateUnaryShim)
 

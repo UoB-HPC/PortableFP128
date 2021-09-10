@@ -95,7 +95,6 @@
   op(cos, FP128, FP128)                         \
   op(erf, FP128, FP128)                         \
   op(erfc, FP128, FP128)                        \
-  op(exp2, FP128, FP128)                        \
   op(exp, FP128, FP128)                         \
   op(expm1, FP128, FP128)                       \
   op(fabs, FP128, FP128)                        \
@@ -116,7 +115,9 @@
   op(tanh, FP128, FP128)                        \
   op(tgamma, FP128, FP128)                      \
   op(trunc, FP128, FP128)                       
-// acosh is not hgappy with pi/4as an argument, so we treat it separately
+// acosh is not happy with pi/4as an argument, so we treat it separately
+// exp2 is not available everywhere...
+//   op(exp2, FP128, FP128)                     
 
 #define FOREACH_128TOINT_UNARY_FUNCTION(op)     \
   op(ilogb, int, FP128,"d")                     \

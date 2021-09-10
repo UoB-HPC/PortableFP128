@@ -10,7 +10,7 @@
 #include <stdint.h>
 #include <math.h>
 #include <complex.h>
-#define PFP128_SHOW_CONFIG 1
+// #define PFP128_SHOW_CONFIG 1
 #include "pfp128.h"
 
 // Expand a macro and convert the result into a string
@@ -42,6 +42,14 @@
 #define COMPILER_NAME "GCC: " __VERSION__
 #else
 #define COMPILER_NAME "Unknown compiler"
+#endif
+
+#if (__APPLE__ && __MACH__)
+#define TARGET_OS_NAME "MacOS"
+#elif (defined(LINUX) || defined(__linux__) || defined(__linux))
+#define TARGET_OS_NAME "Linux"
+#else
+#error Unknown operating system
 #endif
 
 // Cheat somewhat; here we extract the underlying function on whatever our system is,
@@ -150,7 +158,7 @@
     restype ourResult  = basename##FP128(M_PI_FP128/4.0);               \
                                                                         \
     if (baseResult == ourResult) {                                      \
-      printf (#basename " passed\n");                                   \
+      printf ("%-9s passed\n", STRINGIFY(basename));                     \
       passes++;                                                         \
     } else {                                                            \
       printf("*** " STRINGIFY(basename) " FAILED: "                     \
@@ -172,7 +180,7 @@ static void test128to128UnaryFunctions() {
     FP128 ourResult  = acoshFP128(M_PI_FP128);
 
     if (baseResult == ourResult) {
-      printf ("acosh passed\n");
+      printf ("acosh     passed\n");
       passes++;
     } else {
       printf("*** acosh FAILED: base=%12.10" FP128_FMT_TAG "f ours=%12.10" FP128_FMT_TAG "f\n",
@@ -188,7 +196,7 @@ static void test128to128UnaryFunctions() {
     restype ourResult  = basename##FP128(M_PI_FP128/4.0);               \
                                                                         \
     if (baseResult == ourResult) {                                      \
-      printf (#basename " passed\n");                                   \
+      printf ("%-9s passed\n", STRINGIFY(basename));                     \
       passes++;                                                         \
     } else {                                                            \
       printf("*** " #basename " FAILED: base=%12" fmt " ours=%12" fmt "\n", \
@@ -207,7 +215,7 @@ static void test128toIntUnaryFunctions() {
     restype ourResult  = basename##FP128(arg);                          \
                                                                         \
     if (baseResult == ourResult) {                                      \
-      printf (#basename " passed\n");                                   \
+      printf ("%-9s passed\n", STRINGIFY(basename));                     \
       passes++;                                                         \
     } else {                                                            \
       printf("*** " #basename " FAILED: base=%12.10" FP128_FMT_TAG      \
@@ -229,7 +237,7 @@ static void testComplexTo128UnaryFunctions() {
     restype ourResult  = basename##FP128(arg);                          \
                                                                         \
     if (baseResult == ourResult) {                                      \
-      printf (#basename " passed\n");                                   \
+      printf ("%-9s passed\n", STRINGIFY(basename));                     \
       passes++;                                                         \
     } else {                                                            \
       printf("*** " #basename " FAILED: base=(%12.10" FP128_FMT_TAG     \
@@ -265,7 +273,7 @@ static void testComplexToComplexUnaryFunctions() {
     restype ourResult  = basename##FP128(M_PI_FP128/4.0, 1.0);          \
                                                                         \
     if (baseResult == ourResult) {                                      \
-      printf (#basename " passed\n");                                   \
+      printf ("%-9s passed\n", STRINGIFY(basename));                     \
       passes++;                                                         \
     } else {                                                            \
       printf("*** " #basename " FAILED: base=%12.10" FP128_FMT_TAG      \
@@ -318,7 +326,7 @@ static int checkSize() {
 }
 
 int main (int argc, char ** argv) {
-  printf (COMPILER_NAME " targeting " TARGET_ARCH_NAME "\n");
+  printf (COMPILER_NAME " targeting " TARGET_OS_NAME " on " TARGET_ARCH_NAME "\n");
   if (!checkSize()) {
     printf ("checkSize failed\n");
     return 1;

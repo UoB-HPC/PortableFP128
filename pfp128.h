@@ -23,12 +23,8 @@
 #include <float.h>
 #include <complex.h>
 
-#if (!(__x86_64__ || __aarch64__ || __riscv || __arm__))
-# error Unknown target architecture.
-#endif
-
-#if (0)
-// Architecture neutral stuff, which we hope will catch what is going on!
+// #if (0)
+// Architecture neutral C standard stuff, which we hope will catch what is going on!
 // The compiler supports the IEC 559 specification, however, that does
 // not actually require support for the 128b type.
 // So we check whether the property macros for FLT128 are present
@@ -47,39 +43,40 @@ typedef _Complex _Float128 COMPLEX_FP128;
 # define FP128_CONST(val) val ## F128
 # define FP128Name(function) function ## f128
 #endif
-#endif // zero-ed out
+// #endif // zero-ed out
 
 #if (defined(__LONG_DOUBLE_IEEE128__))
 # if (PFP128_SHOW_CONFIG)
 #  warning __LONG_DOUBLE_IEEE128__ defined
 # endif
-# define USE_LONGDOUBLE_FP128 1
+# define FP128_IS_LONGDOUBLE 1
 // No standard conformant support has been promised by the implementation.
 // So we have to guess based on the target and compiler.
 // First check for the case we believe does not provide any support.
 #elif (__APPLE__ && __MACH__ && __aarch64__)
-# warning "No IEEE 128b float seems to be available on MacOS/AArch64..."
-# warning "FP128 will only be the same as double (i.e. 64b)."
+# warning No IEEE 128b float seems to be available on MacOS/AArch64...
+# warning FP128 will only be the same as double (i.e. 64b).
+# warning Invoked with PFP128_SHOW_CONFIG: targeting MacOS AArch64
 // Use long double, but it'll only be 64b
-# define USE_LONGDOUBLE_FP128 1
+# define FP128_IS_LONGDOUBLE 1
 #elif (__arm__)
-# warning "No IEEE 128b float seems to be available on 32b Arm..."
-# warning "FP128 will only be the same as double (i.e. 64b)."
+# warning No IEEE 128b float seems to be available on 32b Arm...
+# warning FP128 will only be the same as double (i.e. 64b).
 // Use long double, but it'll only be 64b
-#define USE_LONGDOUBLE_FP128 1
+#define FP128_IS_LONGDOUBLE 1
 #elif (__aarch64__)
 // We can use long double with both LLVM and GCC,
 // and, other than on MacOS, that gets us what we want.
 # if (PFP128_SHOW_CONFIG)
-#  warning __aarch64__ and not on MacOS
+#  warning Invoked with PFP128_SHOW_CONFIG: targeting AArch64 (not MacOS)
 # endif
-# define USE_LONGDOUBLE_FP128 1
+# define FP128_IS_LONGDOUBLE 1
 #elif (__x86_64__)
 # if (PFP128_SHOW_CONFIG)
-#  warning __x86_64__ 
+#  warning Invoked with PFP128_SHOW_CONFIG: targeting x86_64
 # endif
 
-// long double is not the IEEE 128b format.
+// long double is not the IEEE 128b format and we need libquadmath
 #include <quadmath.h>
 
 // Need to step very carefully around 80b floats!
@@ -93,7 +90,7 @@ typedef __complex128 COMPLEX_FP128;
 # error On an architecture this code does not understand.
 #endif
 
-#if (defined (__LONG_DOUBLE_IEEE128__) || USE_LONGDOUBLE_FP128)
+#if (defined (__LONG_DOUBLE_IEEE128__) || FP128_IS_LONGDOUBLE)
 // The compiler supports IEEE 128b float as long double.
 // Or we are pretending that it does...
 // The C standard only requires that long double
@@ -106,8 +103,6 @@ typedef _Complex long double COMPLEX_FP128;
 #define FP128_CONST(val) val ## L
 #define FP128Name(function) function ## l
 #endif
-
-#undef USE_LONGDOUBLE_FP128
 
 // From here on the code is common no matter what the underlying implementation.
 
@@ -225,14 +220,6 @@ FOREACH_TERNARY_FUNCTION(CreateTernaryShim)
 
 // clang-format on
 
-// Cleanliness
-#undef FOREACH_UNARY_FUNCTION
-#undef FOREACH_BINARY_FUNCTION
-#undef FOREACH_TERNARY_FUNCTION
-#undef CreateUnaryShim
-#undef CreateBinaryShim
-#undef CreateTernaryShim
-
 // Constants
 // I have no idea why there is the inconsistency in naming between these
 // constants which have the type at the front, and the others which have the
@@ -270,6 +257,13 @@ FOREACH_TERNARY_FUNCTION(CreateTernaryShim)
 #define M_SQRT1_2_FP128	FP128_CONST(0.707106781186547524400844362104849039)  /* 1/sqrt(2) */
 
 // Cleanliness
+#undef FP128_IS_LONGDOUBLE
 #undef FP128Name
+#undef FOREACH_UNARY_FUNCTION
+#undef FOREACH_BINARY_FUNCTION
+#undef FOREACH_TERNARY_FUNCTION
+#undef CreateUnaryShim
+#undef CreateBinaryShim
+#undef CreateTernaryShim
 
 #endif // Header monotonicity

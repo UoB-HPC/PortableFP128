@@ -70,7 +70,6 @@ typedef _Complex _Float128 COMPLEX_FP128;
 # if (PFP128_SHOW_CONFIG)
 #  warning Invoked with PFP128_SHOW_CONFIG: targeting AArch64 (not MacOS)
 # endif
-# define FP128_IS_LONGDOUBLE 1
 #elif (__x86_64__)
 # if (PFP128_SHOW_CONFIG)
 #  warning Invoked with PFP128_SHOW_CONFIG: targeting x86_64
@@ -86,6 +85,10 @@ typedef __complex128 COMPLEX_FP128;
 # define FP128_FMT_TAG "Q" // as a format suffix in printf,
 # define FP128_CONST(val) val ## Q
 # define FP128Name(function) function ## q
+
+static inline FP128 strtoFP128(char const * s, char **sp) {
+  return strtoFP128(s,sp);
+}
 #else
 # error On an architecture this code does not understand.
 #endif
@@ -102,6 +105,13 @@ typedef _Complex long double COMPLEX_FP128;
 #define FP128_FMT_TAG "L" // Format suffix in printf,
 #define FP128_CONST(val) val ## L
 #define FP128Name(function) function ## l
+#endif
+
+#if (FP128_IS_LONGDOUBLE)
+#include <stdlib.h>
+static inline FP128 strtoFP128(char const * s, char **sp) {
+  return strtold(s,sp);
+}
 #endif
 
 // From here on the code is common no matter what the underlying implementation.

@@ -116,7 +116,7 @@
   op(tgamma, FP128, FP128)                      \
   op(trunc, FP128, FP128)                       
 // acosh is not happy with pi/4as an argument, so we treat it separately
-// exp2 is not available everywhere...
+// exp2 does not seem to be available everywhere...
 //   op(exp2, FP128, FP128)                     
 
 #define FOREACH_128TOINT_UNARY_FUNCTION(op)     \
@@ -216,11 +216,11 @@ static void test128toIntUnaryFunctions() {
     restype ourResult  = basename##FP128(arg);                          \
                                                                         \
     if (baseResult == ourResult) {                                      \
-      printf ("%-9s passed\n", STRINGIFY(basename));                     \
+      printf ("%-9s passed\n", STRINGIFY(basename));                    \
       passes++;                                                         \
     } else {                                                            \
       printf("*** " #basename " FAILED: base=%12.10" FP128_FMT_TAG      \
-             "f ours=%12.10" FP128_FMT_TAG "f\n",                        \
+             "f ours=%12.10" FP128_FMT_TAG "f\n",                       \
              baseResult,                                                \
              ourResult);                                                \
       failures++;                                                       \
@@ -238,7 +238,7 @@ static void testComplexTo128UnaryFunctions() {
     restype ourResult  = basename##FP128(arg);                          \
                                                                         \
     if (baseResult == ourResult) {                                      \
-      printf ("%-9s passed\n", STRINGIFY(basename));                     \
+      printf ("%-9s passed\n", STRINGIFY(basename));                    \
       passes++;                                                         \
     } else {                                                            \
       printf("*** " #basename " FAILED: base=(%12.10" FP128_FMT_TAG     \
@@ -268,13 +268,15 @@ static void testComplexToComplexUnaryFunctions() {
   op(fmod, FP128, FP128, FP128)                 \
   op(hypot, FP128, FP128, FP128)
 
+// Missing ldexp, modf
+
 #define Test128BinaryFunction(basename, restype, at1, at2)              \
   {                                                                     \
     restype baseResult = FP128Name(basename)(M_PI_FP128/4.0, 1.0);      \
     restype ourResult  = basename##FP128(M_PI_FP128/4.0, 1.0);          \
                                                                         \
     if (baseResult == ourResult) {                                      \
-      printf ("%-9s passed\n", STRINGIFY(basename));                     \
+      printf ("%-9s passed\n", STRINGIFY(basename));                    \
       passes++;                                                         \
     } else {                                                            \
       printf("*** " #basename " FAILED: base=%12.10" FP128_FMT_TAG      \
@@ -284,12 +286,24 @@ static void testComplexToComplexUnaryFunctions() {
     }                                                                   \
   }
 
+// Missing ternary functions, requo, fma
+
 // clang-format on
 
 static void test128BinaryFunctions() {
   FOREACH_128BINARY_FUNCTION(Test128BinaryFunction)
 }    
 
+static void testInput() {
+  FP128 value = strtoFP128("2.718281828459045235360287471352662498", (void *)0);
+  if (value == M_E_FP128) {
+    printf("strtoFP128 passed\n");
+    passes++;
+  } else {
+    printf("*** strtoFP128 FAILED\n");
+    failures++;
+  }
+}
 static int checkSize() {
   printf ("sizeof(long double) = %lu bytes - %lu bits\n",
           sizeof(long double), 8*sizeof(long double));
@@ -298,7 +312,7 @@ static int checkSize() {
   if (sizeof(FP128) != 128/8) {
     printf ("*** FP128 is not being converted to a 128b underlying type! ***\n");
     printf ("*** Results merely show that the shorter (%lub) type works. ***\n", sizeof(FP128)*8);
-    return 1;
+    return 0;
   }
   // On x86_64, the long double type is only 80b, but is padded to 128b for alignment,
   // so sizeof will still return 16 even though only 10 bytes are used.
@@ -327,17 +341,23 @@ static int checkSize() {
 }
 
 int main (int argc, char ** argv) {
-  printf (COMPILER_NAME " targeting " TARGET_OS_NAME " on " TARGET_ARCH_NAME "\n");
-  if (!checkSize()) {
-    printf ("checkSize failed\n");
-    return 1;
-  }
+  printf (COMPILER_NAME " targeting " TARGET_OS_NAME " running on " TARGET_ARCH_NAME "\n");
+  int sizeOK = checkSize();
+  //  if (!checkSize()) {
+  //    printf ("checkSize failed\n");
+  //    return 1;
+  //  }
   test128to128UnaryFunctions();
   test128toIntUnaryFunctions();
   testComplexTo128UnaryFunctions();
   testComplexToComplexUnaryFunctions();
   test128BinaryFunctions();
-  
+  testInput();
+
+  if (!sizeOK)
+    printf ("*** FP128 is not being converted to a 128b underlying type! ***\n");
   printf ("*** %d pass%s, %d failure%s ***\n", passes, passes==1?"":"es", failures, failures==1?"":"s");
+  printf ("(Not tested: exp2, ldexp, modf, remquo, fma)\n");
+
   return failures;
 }

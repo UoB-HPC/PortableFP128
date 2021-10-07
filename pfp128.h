@@ -19,61 +19,62 @@
 // Tell the system headers that we want all of the types, please.
 // (Not that it seems to do much good!)
 #define __STDC_WANT_IEC_60559_TYPES_EXT__ 1
-#include <math.h>
-#include <float.h>
 #include <complex.h>
+#include <float.h>
+#include <math.h>
 
-
-// Architecture neutral C standard stuff, which we hope will catch what is going on!
-// The compiler supports the IEC 559 specification, however, that does
-// not actually require support for the 128b type.
-// So we check whether the property macros for FLT128 are present
+// Architecture neutral C standard stuff, which we hope will catch what is going
+// on! The compiler supports the IEC 559 specification, however, that does not
+// actually require support for the 128b type. So we check whether the property
+// macros for FLT128 are present
 
 // Zeroed out for now, since although GCC sets this on x86_64, linux,
 // the foof128 function names are not present in libm :-(
-#if (0 && ((defined(__STDC_IEC_60559_TYPES__) ||	\
-	    defined(__STDC_IEC_559__)) &&		\
-	   defined(FLT128_MAX)))
-# if (PFP128_SHOW_CONFIG)
-#  warning __STDC_IEC_60559_TYPES__ or __STDC_IEC_559__ defined with FLT128_MAX
-# endif
-typedef _Float128 FP128; 
+#if (0 && ((defined(__STDC_IEC_60559_TYPES__) || defined(__STDC_IEC_559__)) && \
+           defined(FLT128_MAX)))
+#if (PFP128_SHOW_CONFIG)
+#warning __STDC_IEC_60559_TYPES__ or __STDC_IEC_559__ defined with FLT128_MAX
+#endif
+typedef _Float128 FP128;
 typedef _Complex _Float128 COMPLEX_FP128;
 // No format specifier is given in the standard...
-// We assume for now that we're dealing with a GNU implementation and that 'q'
+// We assume for now that we're dealing with a GNU implementation and that 'Q'
 // will work.
-# define FP128_FMT_TAG "Q" // Format suffix in printf,
-# define FP128_CONST(val) val ## F128
-# define FP128Name(function) function ## f128
+#define FP128_FMT_TAG "Q" // Format suffix in printf
+#define FP128_CONST(val) val##F128
+#define FP128Name(function) function##f128
 #elif (defined(__LONG_DOUBLE_IEEE128__))
-# if (PFP128_SHOW_CONFIG)
-#  warning __LONG_DOUBLE_IEEE128__ defined
-# endif
-# define FP128_IS_LONGDOUBLE 1
+#if (PFP128_SHOW_CONFIG)
+#warning __LONG_DOUBLE_IEEE128__ defined
+#endif
 // No standard conformant support has been promised by the implementation.
 // So we have to guess based on the target and compiler.
 // First check for the case we believe does not provide any support.
 #elif (__APPLE__ && __MACH__ && __aarch64__)
-# warning No IEEE 128b float seems to be available on MacOS/AArch64...
-# warning FP128 will only be the same as double (i.e. 64b).
-# warning Invoked with PFP128_SHOW_CONFIG: targeting MacOS AArch64
+#warning No IEEE 128b float seems to be available on MacOS/AArch64...
+#warning FP128 will only be the same as double (i.e. 64b).
+#if (PFP128_SHOW_CONFIG)
+#warning Invoked with PFP128_SHOW_CONFIG: targeting MacOS AArch64
+#endif
 // Use long double, but it'll only be 64b
-# define FP128_IS_LONGDOUBLE 1
+#define FP128_IS_LONGDOUBLE 1
 #elif (__arm__)
-# warning No IEEE 128b float seems to be available on 32b Arm...
-# warning FP128 will only be the same as double (i.e. 64b).
-// Use long double, but it'll only be 64b
+#warning No IEEE 128b float seems to be available on 32b Arm...
+#warning FP128 will only be the same as double (i.e. 64b).
+// Use long double, but it'll only be 64b, so this name is a bit misleading
+// but it has the appropriate effect.
 #define FP128_IS_LONGDOUBLE 1
 #elif (__aarch64__)
 // We can use long double with both LLVM and GCC,
 // and, other than on MacOS, that gets us what we want.
-# if (PFP128_SHOW_CONFIG)
-#  warning Invoked with PFP128_SHOW_CONFIG: targeting AArch64 (not MacOS)
-# endif
+#define FP128_IS_LONGDOUBLE 1
+#if (PFP128_SHOW_CONFIG)
+#warning Invoked with PFP128_SHOW_CONFIG: targeting AArch64 (not MacOS)
+#endif
 #elif (__x86_64__)
-# if (PFP128_SHOW_CONFIG)
-#  warning Invoked with PFP128_SHOW_CONFIG: targeting x86_64
-# endif
+#if (PFP128_SHOW_CONFIG)
+#warning Invoked with PFP128_SHOW_CONFIG: targeting x86_64
+#endif
 
 // long double is not the IEEE 128b format and we need libquadmath
 #include <quadmath.h>
@@ -82,39 +83,40 @@ typedef _Complex _Float128 COMPLEX_FP128;
 typedef __float128 FP128; // Both LLVM and GCC support the __float128 type,
 typedef __complex128 COMPLEX_FP128;
 
-# define FP128_FMT_TAG "Q" // as a format suffix in printf,
-# define FP128_CONST(val) val ## Q
-# define FP128Name(function) function ## q
+#define FP128_FMT_TAG "Q" // as a format suffix in printf,
+#define FP128_CONST(val) val##Q
+#define FP128Name(function) function##q
 
-static inline FP128 strtoFP128(char const * s, char **sp) {
-  return strtoFP128(s,sp);
+static inline FP128 strtoFP128(char const *s, char **sp) {
+  return strtoflt128(s, sp);
 }
 #else
-# error On an architecture this code does not understand.
+#error On an architecture this code does not understand.
 #endif
 
-#if (defined (__LONG_DOUBLE_IEEE128__) || FP128_IS_LONGDOUBLE)
+#if (defined(__LONG_DOUBLE_IEEE128__) || FP128_IS_LONGDOUBLE)
 // The compiler supports IEEE 128b float as long double.
 // Or we are pretending that it does...
 // The C standard only requires that long double
 // is at least as large as double, so it  may be accepted
 // syntactically, but not get you any more precision.
-typedef long double FP128; // Both LLVM and GCC support the long float
+typedef long double FP128; // Both LLVM and GCC support long double
 typedef _Complex long double COMPLEX_FP128;
 
 #define FP128_FMT_TAG "L" // Format suffix in printf,
-#define FP128_CONST(val) val ## L
-#define FP128Name(function) function ## l
+#define FP128_CONST(val) val##L
+#define FP128Name(function) function##l
 #endif
 
 #if (FP128_IS_LONGDOUBLE)
 #include <stdlib.h>
-static inline FP128 strtoFP128(char const * s, char **sp) {
-  return strtold(s,sp);
+static inline FP128 strtoFP128(char const *s, char **sp) {
+  return strtold(s, sp);
 }
 #endif
 
 // From here on the code is common no matter what the underlying implementation.
+// So if you're adding more functions do it here.
 
 // Maths functions
 // Implememt inline static shims.
@@ -255,19 +257,31 @@ FOREACH_TERNARY_FUNCTION(CreateTernaryShim)
 #define HUGE_VALFP128 FP128Name(HUGE_VAL)
 
 // Properties of mathematics; we delegate here just for simplicity.
-#define M_E_FP128	FP128_CONST(2.718281828459045235360287471352662498)  /* e */
-#define M_LOG2E_FP128	FP128_CONST(1.442695040888963407359924681001892137)  /* log_2 e */
-#define M_LOG10E_FP128	FP128_CONST(0.434294481903251827651128918916605082)  /* log_10 e */
-#define M_LN2_FP128	FP128_CONST(0.693147180559945309417232121458176568)  /* log_e 2 */
-#define M_LN10_FP128	FP128_CONST(2.302585092994045684017991454684364208)  /* log_e 10 */
-#define M_PI_FP128	FP128_CONST(3.141592653589793238462643383279502884)  /* pi */
-#define M_PI_2_FP128	FP128_CONST(1.570796326794896619231321691639751442)  /* pi/2 */
-#define M_PI_4_FP128	FP128_CONST(0.785398163397448309615660845819875721)  /* pi/4 */
-#define M_1_PI_FP128	FP128_CONST(0.318309886183790671537767526745028724)  /* 1/pi */
-#define M_2_PI_FP128	FP128_CONST(0.636619772367581343075535053490057448)  /* 2/pi */
-#define M_2_SQRTPI_FP128 FP128_CONST(1.128379167095512573896158903121545172)  /* 2/sqrt(pi) */
-#define M_SQRT2_FP128	FP128_CONST(1.414213562373095048801688724209698079)  /* sqrt(2) */
-#define M_SQRT1_2_FP128	FP128_CONST(0.707106781186547524400844362104849039)  /* 1/sqrt(2) */
+#define M_E_FP128 FP128_CONST(2.718281828459045235360287471352662498) /* e */
+#define M_LOG2E_FP128                                                          \
+  FP128_CONST(1.442695040888963407359924681001892137) /* log_2 e */
+#define M_LOG10E_FP128                                                         \
+  FP128_CONST(0.434294481903251827651128918916605082) /* log_10 e */
+#define M_LN2_FP128                                                            \
+  FP128_CONST(0.693147180559945309417232121458176568) /* log_e 2 */
+#define M_LN10_FP128                                                           \
+  FP128_CONST(2.302585092994045684017991454684364208) /* log_e 10 */
+#define M_PI_FP128 FP128_CONST(3.141592653589793238462643383279502884) /* pi   \
+                                                                        */
+#define M_PI_2_FP128                                                           \
+  FP128_CONST(1.570796326794896619231321691639751442) /* pi/2 */
+#define M_PI_4_FP128                                                           \
+  FP128_CONST(0.785398163397448309615660845819875721) /* pi/4 */
+#define M_1_PI_FP128                                                           \
+  FP128_CONST(0.318309886183790671537767526745028724) /* 1/pi */
+#define M_2_PI_FP128                                                           \
+  FP128_CONST(0.636619772367581343075535053490057448) /* 2/pi */
+#define M_2_SQRTPI_FP128                                                       \
+  FP128_CONST(1.128379167095512573896158903121545172) /* 2/sqrt(pi) */
+#define M_SQRT2_FP128                                                          \
+  FP128_CONST(1.414213562373095048801688724209698079) /* sqrt(2) */
+#define M_SQRT1_2_FP128                                                        \
+  FP128_CONST(0.707106781186547524400844362104849039) /* 1/sqrt(2) */
 
 // Cleanliness
 #undef FP128_IS_LONGDOUBLE

@@ -6,10 +6,20 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include <stdio.h>
-#include <stdint.h>
-#include <math.h>
+//
+// A simple test code which simply checks that our interface
+// is finding all of the underlying functions.
+// We are *not* checking that those underlying functions behave
+// correctly, that is an SEP (Someone Else's Problem), merely that
+// our shim layer is working.
+// As such failures are most likely at compile or link time.
+//
+
 #include <complex.h>
+#include <math.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
 // #define PFP128_SHOW_CONFIG 1
 #include "pfp128.h"
 
@@ -52,11 +62,11 @@
 #error Unknown operating system
 #endif
 
-// Cheat somewhat; here we extract the underlying function on whatever our system is,
-// and then compare the output for each of the functions going directly to the underlying function,
-// or via the FP128 interface.
-// That does mean that we're cpopying a bunch of code from the header, but
-// if its wrong that should hurt here too.
+// Cheat somewhat; here we extract the underlying function on whatever our
+// system is, and then compare the output for each of the functions going
+// directly to the underlying function, or via the FP128 interface. That does
+// mean that we're cpopying a bunch of code from the header, but if its wrong
+// that should hurt here too.
 
 // If the compiler has already set this, that's fine with us;
 // if not, set it for the cases we know about.
@@ -68,14 +78,14 @@
 #define __LONG_DOUBLE_IEEE128__ 1
 #endif
 #endif
-  
+
 #if (defined(__LONG_DOUBLE_IEEE128__))
-#define FP128Name(base) base ## l
-#define FP128ConstName(base) base ## L
+#define FP128Name(base) base##l
+#define FP128ConstName(base) base##L
 #else
 // long double is not the IEEE 128b format.
-#define FP128Name(base) base ## q
-#define FP128ConstName(base) base ## Q
+#define FP128Name(base) base##q
+#define FP128ConstName(base) base##Q
 #endif // end of architecture spcific setup.
 
 // From here on the code is common no matter what the underlying implementation.
@@ -159,7 +169,8 @@
     restype ourResult  = basename##FP128(M_PI_FP128/4.0);               \
                                                                         \
     if (baseResult == ourResult) {                                      \
-      printf ("%-9s passed\n", STRINGIFY(basename));                     \
+      if (verbose)                                                      \
+        printf ("%-9s passed\n", STRINGIFY(basename));                  \
       passes++;                                                         \
     } else {                                                            \
       printf("*** " STRINGIFY(basename) " FAILED: "                     \
@@ -172,6 +183,7 @@
 
 static int passes = 0;
 static int failures = 0;
+static int verbose = 0;
 
 static void test128to128UnaryFunctions() {
   FOREACH_128TO128_UNARY_FUNCTION(TestUnary128to128Function)
@@ -181,7 +193,8 @@ static void test128to128UnaryFunctions() {
     FP128 ourResult  = acoshFP128(M_PI_FP128);
 
     if (baseResult == ourResult) {
-      printf ("acosh     passed\n");
+      if (verbose)
+        printf ("acosh     passed\n");
       passes++;
     } else {
       printf("*** acosh FAILED: base=%12.10" FP128_FMT_TAG "f ours=%12.10" FP128_FMT_TAG "f\n",
@@ -197,7 +210,8 @@ static void test128to128UnaryFunctions() {
     restype ourResult  = basename##FP128(M_PI_FP128/4.0);               \
                                                                         \
     if (baseResult == ourResult) {                                      \
-      printf ("%-9s passed\n", STRINGIFY(basename));                     \
+      if (verbose)                                                      \
+        printf ("%-9s passed\n", STRINGIFY(basename));                  \
       passes++;                                                         \
     } else {                                                            \
       printf("*** " #basename " FAILED: base=%12" fmt " ours=%12" fmt "\n", \
@@ -216,7 +230,8 @@ static void test128toIntUnaryFunctions() {
     restype ourResult  = basename##FP128(arg);                          \
                                                                         \
     if (baseResult == ourResult) {                                      \
-      printf ("%-9s passed\n", STRINGIFY(basename));                    \
+      if (verbose)                                                      \
+        printf ("%-9s passed\n", STRINGIFY(basename));                  \
       passes++;                                                         \
     } else {                                                            \
       printf("*** " #basename " FAILED: base=%12.10" FP128_FMT_TAG      \
@@ -238,7 +253,8 @@ static void testComplexTo128UnaryFunctions() {
     restype ourResult  = basename##FP128(arg);                          \
                                                                         \
     if (baseResult == ourResult) {                                      \
-      printf ("%-9s passed\n", STRINGIFY(basename));                    \
+      if (verbose)                                                      \
+        printf ("%-9s passed\n", STRINGIFY(basename));                  \
       passes++;                                                         \
     } else {                                                            \
       printf("*** " #basename " FAILED: base=(%12.10" FP128_FMT_TAG     \
@@ -276,7 +292,8 @@ static void testComplexToComplexUnaryFunctions() {
     restype ourResult  = basename##FP128(M_PI_FP128/4.0, 1.0);          \
                                                                         \
     if (baseResult == ourResult) {                                      \
-      printf ("%-9s passed\n", STRINGIFY(basename));                    \
+      if (verbose)                                                      \
+         printf ("%-9s passed\n", STRINGIFY(basename));                 \
       passes++;                                                         \
     } else {                                                            \
       printf("*** " #basename " FAILED: base=%12.10" FP128_FMT_TAG      \
@@ -292,72 +309,80 @@ static void testComplexToComplexUnaryFunctions() {
 
 static void test128BinaryFunctions() {
   FOREACH_128BINARY_FUNCTION(Test128BinaryFunction)
-}    
+}
 
 static void testInput() {
   FP128 value = strtoFP128("2.718281828459045235360287471352662498", (void *)0);
   if (value == M_E_FP128) {
-    printf("strtoFP128 passed\n");
+    if (verbose)
+      printf("strtoFP128 passed\n");
     passes++;
   } else {
     printf("*** strtoFP128 FAILED\n");
     failures++;
   }
 }
-static int checkSize() {
-  printf ("sizeof(long double) = %lu bytes - %lu bits\n",
-          sizeof(long double), 8*sizeof(long double));
-  printf ("sizeof(FP128)       = %lu bytes - %lu bits\n",
-          sizeof(FP128), 8*sizeof(FP128));
-  if (sizeof(FP128) != 128/8) {
-    printf ("*** FP128 is not being converted to a 128b underlying type! ***\n");
-    printf ("*** Results merely show that the shorter (%lub) type works. ***\n", sizeof(FP128)*8);
-    return 0;
+
+static int bytesUsed(uint8_t const *p) {
+  // Assume little endian and 64B allocation
+  // Assume little-endian byte layout.
+  for (int i = 15; i >= 0; i--) {
+    if (p[i] & 0x80)
+      return i + 1;
   }
-  // On x86_64, the long double type is only 80b, but is padded to 128b for alignment,
-  // so sizeof will still return 16 even though only 10 bytes are used.
-  // Assuming we're on a little endian machine, we can check for that by looking at the
-  // sign bit...
+  return -1;
+}
+
+static void checkSize() {
+  union {
+    long double d;
+    uint8_t bytes[16];
+  } u;
+  memset(u.bytes, 0, sizeof(u.bytes));
+  u.d = -1.0l;
+  int bu = bytesUsed(u.bytes);
+  printf("sizeof(long double) = %lu bytes: %lu bits; data used = %d bytes : %d "
+         "bits\n",
+         sizeof(long double), 8 * sizeof(long double), bu, bu * 8);
+
   union {
     FP128 d;
     uint8_t bytes[16];
-  } u;
-  // I know, memset ...
-  for (int i=0; i<16; i++) {
-    u.bytes[i] = 0;
+  } v;
+  // On x86_64, the long double type is only 80b, but is padded to 128b for
+  // alignment, so sizeof will still return 16 even though only 10 bytes are
+  // used. Assuming we're on a little endian machine, we can check for that by
+  // looking at the sign bit...
+  memset(v.bytes, 0, sizeof(v.bytes));
+  v.d = FP128_CONST(-1.0);
+  bu = bytesUsed(&v.bytes[0]);
+  printf("sizeof(FP128)       = %lu bytes: %lu bits; data used = %d bytes : %d "
+         "bits\n",
+         sizeof(FP128), 8 * sizeof(FP128), bu, bu * 8);
+
+  if (sizeof(FP128) != 128 / 8) {
+    printf("*** FP128 is not being converted to a 128b underlying type! ***\n");
+    printf("*** Results merely show that the shorter (%lub) type works. ***\n",
+           sizeof(FP128) * 8);
+    return;
   }
-  u.d = FP128_CONST(-1.0);
-  int i;
-  for (i=15; i>=0; i--) {
-    if ((u.bytes[i] & 0x80)) {
-      break;
-    }
-  }
-  if (i != 15) {
-    printf ("FP128 seems to be using %d bytes (not all 16)\n", i+1);
-    return 0;
-  }
-  return 1;
 }
 
-int main (int argc, char ** argv) {
-  printf (COMPILER_NAME " targeting " TARGET_OS_NAME " running on " TARGET_ARCH_NAME "\n");
-  int sizeOK = checkSize();
-  //  if (!checkSize()) {
-  //    printf ("checkSize failed\n");
-  //    return 1;
-  //  }
+int main(int argc, char **argv) {
+  verbose = argc > 1;
   test128to128UnaryFunctions();
   test128toIntUnaryFunctions();
   testComplexTo128UnaryFunctions();
   testComplexToComplexUnaryFunctions();
   test128BinaryFunctions();
   testInput();
+  printf("(Not tested: exp2, ldexp, modf, remquo, fma)\n");
 
-  if (!sizeOK)
-    printf ("*** FP128 is not being converted to a 128b underlying type! ***\n");
-  printf ("*** %d pass%s, %d failure%s ***\n", passes, passes==1?"":"es", failures, failures==1?"":"s");
-  printf ("(Not tested: exp2, ldexp, modf, remquo, fma)\n");
+  printf(COMPILER_NAME " targeting " TARGET_OS_NAME
+                       " running on " TARGET_ARCH_NAME "\n");
+  (void)checkSize();
+  printf("*** %d pass%s, %d failure%s ***\n", passes, passes == 1 ? "" : "es",
+         failures, failures == 1 ? "" : "s");
 
   return failures;
 }

@@ -360,6 +360,10 @@ static void testPrintf() {
 	   "*** not     '%s'\n",&line[0],correct);
     failures++;
   }
+
+  if (sizeof(FP128) != 16) {
+    printf ("*** These failures are expected, since the notional FP128 type is not really that long!\n");
+  }
 }
 
 static int bytesUsed(uint8_t const *p) {

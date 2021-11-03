@@ -20,7 +20,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-// #define PFP128_SHOW_CONFIG 1
+#define PFP128_SHOW_CONFIG 1
 #include "pfp128.h"
 
 // Expand a macro and convert the result into a string
@@ -65,7 +65,7 @@
 // Cheat somewhat; here we extract the underlying function on whatever our
 // system is, and then compare the output for each of the functions going
 // directly to the underlying function, or via the FP128 interface. That does
-// mean that we're cpopying a bunch of code from the header, but if its wrong
+// mean that we're copying a bunch of code from the header, but if it is wrong
 // that should hurt here too.
 
 // If the compiler has already set this, that's fine with us;
@@ -92,6 +92,20 @@
 // clang-format really messes up the multiple line macro definitions :-(
 // clang-format off
 
+static void printError(char const * baseName,
+		       char const * underlyingName,
+		       FP128 baseResult, FP128 ourResult) {
+  char brstr[100];
+  char orstr[100];
+
+  FP128_snprintf(&brstr[0], sizeof(brstr),
+		 "%12.10" FP128_FMT_TAG "f", baseResult);
+  FP128_snprintf(&orstr[0], sizeof(orstr),
+		 "%12.10" FP128_FMT_TAG "f", ourResult);
+  printf("*** %s FAILED: %sFP128 => %s %s => %s\n",
+	 baseName, baseName, orstr, underlyingName, brstr);				
+}
+		       
 // These functions are all happy with pi/4 as an argument:-)
 #define FOREACH_128TO128_UNARY_FUNCTION(op)     \
   op(acos, FP128, FP128)                        \
@@ -173,10 +187,7 @@
         printf ("%-9s passed\n", STRINGIFY(basename));                  \
       passes++;                                                         \
     } else {                                                            \
-      printf("*** " STRINGIFY(basename) " FAILED: "                     \
-             STRINGIFY(basename##FP128) "(%12.10" FP128_FMT_TAG "f) "   \
-             STRINGIFY(FP128Name(basename))"(%12.10" FP128_FMT_TAG "f)\n", \
-             baseResult, ourResult);                                    \
+      printError(STRINGIFY(basename), STRINGIFY(FP128Name(basename)), baseResult, ourResult); \
       failures++;                                                       \
     }                                                                   \
   }
@@ -197,8 +208,7 @@ static void test128to128UnaryFunctions() {
         printf ("acosh     passed\n");
       passes++;
     } else {
-      printf("*** acosh FAILED: base=%12.10" FP128_FMT_TAG "f ours=%12.10" FP128_FMT_TAG "f\n",
-             baseResult, ourResult);
+      printError(STRINGIFY(acosh), STRINGIFY(FP128Name(acosh)), baseResult, ourResult); 
       failures++;
     }
   }
@@ -296,9 +306,7 @@ static void testComplexToComplexUnaryFunctions() {
          printf ("%-9s passed\n", STRINGIFY(basename));                 \
       passes++;                                                         \
     } else {                                                            \
-      printf("*** " #basename " FAILED: base=%12.10" FP128_FMT_TAG      \
-             "f ours=%12.10" FP128_FMT_TAG "f\n",                       \
-             baseResult, ourResult);                                    \
+      printError(STRINGIFY(basename), STRINGIFY(FP128Name(basename)), baseResult, ourResult); \
       failures++;                                                       \
     }                                                                   \
   }
@@ -319,6 +327,37 @@ static void testInput() {
     passes++;
   } else {
     printf("*** strtoFP128 FAILED\n");
+    failures++;
+  }
+}
+
+// Does snprintf work with the tag we believe should be used?
+static void testPrintf() {
+  char line[64];
+  char const * correct = "2.718281828459045235360287471352662";
+  
+  (void)FP128_snprintf(&line[0], sizeof(line),"%35.33" FP128_FMT_TAG "f", M_E_FP128);
+  if (!strcmp(&line[0],correct)) {
+    if (verbose)
+      printf("FP128_snprintf passed\n");
+    passes++;
+  } else {
+    printf("*** FP128_snprintf FAILED\n"
+	   "*** returns '%s'\n"
+	   "*** not     '%s'\n",&line[0],correct);
+    failures++;
+  }
+
+  // And what about the system version?
+  (void)snprintf(&line[0], sizeof(line),"%35.33" FP128_FMT_TAG "f", M_E_FP128);
+  if (!strcmp(&line[0],correct)) {
+    if (verbose)
+      printf("snprintf  passed\n");
+    passes++;
+  } else {
+    printf("*** snprintf FAILED\n"
+	   "*** returns '%s'\n"
+	   "*** not     '%s'\n",&line[0],correct);
     failures++;
   }
 }
@@ -370,17 +409,20 @@ static void checkSize() {
 
 int main(int argc, char **argv) {
   verbose = argc > 1;
+
+  printf(COMPILER_NAME " targeting " TARGET_OS_NAME
+                       " running on " TARGET_ARCH_NAME "\n");
+  checkSize();
+
   test128to128UnaryFunctions();
   test128toIntUnaryFunctions();
   testComplexTo128UnaryFunctions();
   testComplexToComplexUnaryFunctions();
   test128BinaryFunctions();
   testInput();
+  testPrintf();
   printf("(Not tested: exp2, ldexp, modf, remquo, fma)\n");
 
-  printf(COMPILER_NAME " targeting " TARGET_OS_NAME
-                       " running on " TARGET_ARCH_NAME "\n");
-  (void)checkSize();
   printf("*** %d pass%s, %d failure%s ***\n", passes, passes == 1 ? "" : "es",
          failures, failures == 1 ? "" : "s");
 

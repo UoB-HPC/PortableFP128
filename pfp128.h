@@ -10,7 +10,6 @@
  * A portability shim header to provide support for IEEE FP128
  * on machines/compilers which have the underlying support, but don't
  * provide the C standard interfaces.
- *
  */
 // Header monotonicity.
 #if (!defined(_PFP128_H_INCLUDED_))
@@ -26,6 +25,7 @@
 // Architecture neutral C standard stuff, which we hope will catch what is going
 // on! The compiler supports the IEC 559 specification, however, that does not
 // actually require support for the 128b type. So we check whether the property
+
 // macros for FLT128 are present
 
 // Zeroed out for now, since although GCC sets this on x86_64, linux,
@@ -40,16 +40,28 @@ typedef _Complex _Float128 COMPLEX_FP128;
 // No format specifier is given in the standard...
 // We assume for now that we're dealing with a GNU implementation and that 'Q'
 // will work.
-#define FP128_FMT_TAG "Q" // Format suffix in printf
+#define FP128_FMT_TAG "Q"
+// No way to do this with a static inline because the function takes an ellipsis
+// argument list, and there is no version which takes a va_list.
+#define FP128_snprintf quadmath_snprintf
 #define FP128_CONST(val) val##F128
 #define FP128Name(function) function##f128
-#elif (defined(__LONG_DOUBLE_IEEE128__))
+static inline FP128 strtoFP128(char const *s, char **sp) {
+  return strtoflt128(s, sp);
+}
 #if (PFP128_SHOW_CONFIG)
 #warning __LONG_DOUBLE_IEEE128__ defined
+#warning FP128 is _Float128
+#warning FP128_CONST tag is F128
+#warning FP128 function suffix is f128
+#warning strtoFP128 => strtof128
+#warning 
 #endif
+#elif (defined(__LONG_DOUBLE_IEEE128__))
 // No standard conformant support has been promised by the implementation.
 // So we have to guess based on the target and compiler.
 // First check for the case we believe does not provide any support.
+#define FP128_IS_LONGDOUBLE 1
 #elif (__APPLE__ && __MACH__ && __aarch64__)
 #warning No IEEE 128b float seems to be available on MacOS/AArch64...
 #warning FP128 will only be the same as double (i.e. 64b).
@@ -83,18 +95,31 @@ typedef _Complex _Float128 COMPLEX_FP128;
 typedef __float128 FP128; // Both LLVM and GCC support the __float128 type,
 typedef __complex128 COMPLEX_FP128;
 
-#define FP128_FMT_TAG "Q" // as a format suffix in printf,
 #define FP128_CONST(val) val##Q
 #define FP128Name(function) function##q
+#define FP128_FMT_TAG "Q"
+// No way to do this with a static inline because the function takes an ellipsis
+// argument list, and there is no version which takes a va_list.
+#define FP128_snprintf quadmath_snprintf
 
 static inline FP128 strtoFP128(char const *s, char **sp) {
   return strtoflt128(s, sp);
 }
+
+#if (PFP128_SHOW_CONFIG)
+#warning FP128 is __float128
+#warning FP128_CONST tag is Q
+#warning FP128 function suffix is q
+#warning FP128_FMT_TAG is Q
+#warning FP128_snprintf => quadmath_snprintf
+#warning strtoFP128 => strtoflt128
+#endif
+
 #else
 #error On an architecture this code does not understand.
 #endif
 
-#if (defined(__LONG_DOUBLE_IEEE128__) || FP128_IS_LONGDOUBLE)
+#if (FP128_IS_LONGDOUBLE)
 // The compiler supports IEEE 128b float as long double.
 // Or we are pretending that it does...
 // The C standard only requires that long double
@@ -103,12 +128,20 @@ static inline FP128 strtoFP128(char const *s, char **sp) {
 typedef long double FP128; // Both LLVM and GCC support long double
 typedef _Complex long double COMPLEX_FP128;
 
-#define FP128_FMT_TAG "L" // Format suffix in printf,
 #define FP128_CONST(val) val##L
 #define FP128Name(function) function##l
+#define FP128_FMT_TAG "L"
+#define FP128_snprintf snprintf
+
+#if (PFP128_SHOW_CONFIG)
+#warning FP128 is long double
+#warning FP128_CONST tag is L
+#warning FP128 function suffix is l
+#warning FP128_FMT_TAG is L
+#warning FP128_snprintf => snprintf
+#warning strtoFP128 => strtold
 #endif
 
-#if (FP128_IS_LONGDOUBLE)
 #include <stdlib.h>
 static inline FP128 strtoFP128(char const *s, char **sp) {
   return strtold(s, sp);
@@ -123,22 +156,22 @@ static inline FP128 strtoFP128(char const *s, char **sp) {
 
 // clang-format really messes up the multiple line macro definitions :-(
 // clang-format off
-#define CreateUnaryShim(basename, restype, argtype)             \
-  static inline restype basename ## FP128(argtype arg) {        \
-    return FP128Name(basename)(arg);                            \
-  }
+#define CreateUnaryShim(basename, restype, argtype)	\
+static inline restype basename ## FP128(argtype arg) {	\
+  return FP128Name(basename)(arg);			\
+}
 
 // Could do all of this with one macro if we passed in the argument
 // list rather than the argument types, but it's not much simpler.
 #define CreateBinaryShim(basename, restype, at1, at2)           \
-  static inline restype basename ## FP128(at1 arg1, at2 arg2) { \
-    return FP128Name(basename)(arg1, arg2);                     \
-  }
+static inline restype basename ## FP128(at1 arg1, at2 arg2) {	\
+  return FP128Name(basename)(arg1, arg2);			\
+}
 
 #define CreateTernaryShim(basename, restype, at1, at2, at3)             \
-  static inline restype basename ## FP128(at1 arg1, at2 arg2, at3 arg3) { \
-    return FP128Name(basename)(arg1, arg2, arg3);                       \
-  }
+static inline restype basename ## FP128(at1 arg1, at2 arg2, at3 arg3) { \
+  return FP128Name(basename)(arg1, arg2, arg3);				\
+}
 
 #define FOREACH_UNARY_FUNCTION(op)              \
   op(acos, FP128, FP128)                        \

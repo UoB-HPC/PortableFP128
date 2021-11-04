@@ -21,7 +21,7 @@ Edit your code to replace
 
 # Settings
 The header file ccontains a number of `#warning` directives which can be used to show you what it thinks is going on.
-THese can be enabled by `#define PFP128_SHOW_CONFIG 1` before including the header. 
+These can be enabled by `#define PFP128_SHOW_CONFIG 1` before including the header. 
 
 # Background
 See the blog post at https://cpufun.substack.com/p/portable-support-for-128b-floats for more details on how we got to here!
